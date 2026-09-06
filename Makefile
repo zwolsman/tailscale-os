@@ -95,3 +95,24 @@ qemu-run: check-qemu-board
 		-append 'console=ttyS0,115200 root=/dev/mmcblk0 rootwait'
 
 all: config build
+
+# --- machined package convenience targets ----------------------------- 
+machined: check-board
+	$(MAKE_BR) machined
+ 
+# Re-runs build+install. NOTE: since machined uses SITE_METHOD=local,
+# this does NOT re-copy changed source - use machined-reset for that.
+machined-rebuild: check-board
+	$(MAKE_BR) machined-rebuild
+ 
+# Forces a fresh copy of the local source tree, then rebuilds. This is
+# almost always the target you actually want after editing Go source.
+machined-reset: check-board
+	$(MAKE_BR) machined-dirclean
+	$(MAKE_BR) machined
+
+machined-info: check-board
+	$(MAKE_BR) machined-show-info
+ 
+br: check-board
+	$(MAKE_BR) $(ARGS)
