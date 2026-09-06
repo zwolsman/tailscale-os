@@ -1,0 +1,1 @@
+include $(sort $(wildcard $(BR2_EXTERNAL_TAILSCALEOS_PATH)/package/*/*.mk))
