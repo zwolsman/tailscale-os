@@ -21,13 +21,24 @@ CONFIG_DIR := $(ROOT_DIR)/configs
 BOARDS := $(patsubst $(CONFIG_DIR)/%_tailscaleos_defconfig,%,$(wildcard $(CONFIG_DIR)/*_tailscaleos_defconfig))
 
 ifdef BOARD
-OUT_DIR    := $(ROOT_DIR)/output/$(BOARD)
-DEFCONFIG  := $(BOARD)_tailscaleos_defconfig
-MAKE_BR    := $(MAKE) -C $(BR_DIR) O=$(OUT_DIR) BR2_EXTERNAL=$(EXT_DIR)
+OUT_DIR    	:= $(ROOT_DIR)/output/$(BOARD)
+DEFCONFIG  	:= $(BOARD)_tailscaleos_defconfig
+MAKE_BR    	:= $(MAKE) -C $(BR_DIR) O=$(OUT_DIR) BR2_EXTERNAL=$(EXT_DIR)
+IMAGES_DIR 	:= $(OUT_DIR)/images
+QEMU_ROOTFS	:= $(IMAGES_DIR)/rootfs-qemu.ext2
 endif
 
+# Per-board QEMU settings — add an entry here for each board you want to run in QEMU
+QEMU_MACHINE.orangepi_zero := orangepi-pc
+QEMU_DTB.orangepi_zero     := sun8i-h2-plus-orangepi-zero.dtb
+QEMU_ROOTFS_SIZE          := 64M
+
+QEMU_MACHINE := $(QEMU_MACHINE.$(BOARD))
+QEMU_DTB     := $(QEMU_DTB.$(BOARD))
+
 .PHONY: all config menuconfig linux-menuconfig uboot-menuconfig \
-        savedefconfig build clean distclean list help check-board
+        savedefconfig build clean distclean list help check-board \
+		qemu-rootfs qemu-run qemu-clean check-qemu-board
 
 help:
 	@echo "Targets: config menuconfig linux-menuconfig uboot-menuconfig savedefconfig build clean distclean all list"
@@ -69,5 +80,28 @@ clean: check-board
 
 distclean: check-board
 	rm -rf $(OUT_DIR)
+
+check-qemu-board: check-board
+	@test -n "$(QEMU_MACHINE)" || \
+		(echo "No QEMU_MACHINE defined for BOARD=$(BOARD). Add an entry near the top of the Makefile." && exit 1)
+
+$(QEMU_ROOTFS): check-qemu-board
+	@test -f "$(IMAGES_DIR)/rootfs.ext2" || \
+		(echo "rootfs.ext2 not found in $(IMAGES_DIR). Run 'make build BOARD=$(BOARD)' first." && exit 1)
+	cp $(IMAGES_DIR)/rootfs.ext2 $(QEMU_ROOTFS)
+	qemu-img resize $(QEMU_ROOTFS) $(QEMU_ROOTFS_SIZE)
+	resize2fs $(QEMU_ROOTFS)
+
+qemu-rootfs: $(QEMU_ROOTFS)
+
+qemu-run: qemu-rootfs
+	qemu-system-arm -M $(QEMU_MACHINE) -nic user -nographic \
+		-kernel $(IMAGES_DIR)/zImage \
+		-dtb $(IMAGES_DIR)/$(QEMU_DTB) \
+		-drive file=$(QEMU_ROOTFS),if=sd,format=raw \
+		-append 'console=ttyS0,115200 root=/dev/mmcblk0 rootwait'
+
+qemu-clean: check-board
+	rm -f $(QEMU_ROOTFS)
 
 all: config build
