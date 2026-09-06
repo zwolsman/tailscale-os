@@ -85,23 +85,13 @@ check-qemu-board: check-board
 	@test -n "$(QEMU_MACHINE)" || \
 		(echo "No QEMU_MACHINE defined for BOARD=$(BOARD). Add an entry near the top of the Makefile." && exit 1)
 
-$(QEMU_ROOTFS): check-qemu-board
+qemu-run: check-qemu-board
 	@test -f "$(IMAGES_DIR)/rootfs.ext2" || \
 		(echo "rootfs.ext2 not found in $(IMAGES_DIR). Run 'make build BOARD=$(BOARD)' first." && exit 1)
-	cp $(IMAGES_DIR)/rootfs.ext2 $(QEMU_ROOTFS)
-	qemu-img resize $(QEMU_ROOTFS) $(QEMU_ROOTFS_SIZE)
-	resize2fs $(QEMU_ROOTFS)
-
-qemu-rootfs: $(QEMU_ROOTFS)
-
-qemu-run: qemu-rootfs
 	qemu-system-arm -M $(QEMU_MACHINE) -nic user -nographic \
 		-kernel $(IMAGES_DIR)/zImage \
 		-dtb $(IMAGES_DIR)/$(QEMU_DTB) \
-		-drive file=$(QEMU_ROOTFS),if=sd,format=raw \
+		-drive file=$(IMAGES_DIR)/rootfs.ext2,if=sd,format=raw \
 		-append 'console=ttyS0,115200 root=/dev/mmcblk0 rootwait'
-
-qemu-clean: check-board
-	rm -f $(QEMU_ROOTFS)
 
 all: config build
