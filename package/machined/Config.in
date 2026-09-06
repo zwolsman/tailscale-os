@@ -1,0 +1,11 @@
+config BR2_PACKAGE_MACHINED
+	bool "machined"
+	help
+	  machined is a custom PID 1 replacement written in Go for an
+	  immutable, single-purpose appliance OS. It mounts essential
+	  virtual filesystems, reaps zombie processes, and supervises
+	  tailscaled as its sole managed workload.
+
+	  This package requires BR2_INIT_NONE=y (System configuration ->
+	  Init system -> None), since machined itself is installed as
+	  /sbin/init, replacing BusyBox's init.

@@ -1,0 +1,3 @@
+file cpio bc
+
+sudo update-alternatives --install /usr/bin/install install /usr/bin/gnuinstall 100
