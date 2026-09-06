@@ -52,11 +52,8 @@ func main() {
 	)
 
 	sup := newSupervisor(supervisorConfig{
-		// Placeholder workload. Swap for tailscaled once config parsing and
-		// networking are in place - the supervisor logic itself won't need
-		// to change.
-		path: "/bin/sh",
-		args: []string{"/bin/sh"},
+		path: "/usr/sbin/tailscaled",
+		args: []string{},
 	})
 	sup.start()
 
