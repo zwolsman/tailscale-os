@@ -5,7 +5,7 @@
 ################################################################################
 
 MACHINED_VERSION = 1.0
-MACHINED_SITE = $(BR2_EXTERNAL_TAILSCALEOS_PATH)/internal/machined
+MACHINED_SITE = $(BR2_EXTERNAL_TAILSCALEOS_PATH)/internal/app/machined
 MACHINED_SITE_METHOD = local
 
 MACHINED_LICENSE = Proprietary
