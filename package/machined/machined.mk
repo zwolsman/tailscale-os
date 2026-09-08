@@ -5,7 +5,7 @@
 ################################################################################
 
 MACHINED_VERSION = 1.0
-MACHINED_SITE = $(BR2_EXTERNAL_TAILSCALEOS_PATH)/internal/app/machined
+MACHINED_SITE = $(BR2_EXTERNAL_TAILSCALEOS_PATH)
 MACHINED_SITE_METHOD = local
 
 MACHINED_LICENSE = Proprietary
@@ -17,7 +17,9 @@ MACHINED_LICENSE = Proprietary
 # The golang-package infrastructure builds with CGO disabled and sets
 # GOOS/GOARCH/GOARM automatically from the current Buildroot target
 # definition (BR2_ARCH, BR2_ARM_CPU_*, etc)
-MACHINED_GOMOD = machined
+MACHINED_GOMOD = github.com/zwolsman/tailscale-os
+MACHINED_BUILD_TARGETS = internal/app/machined
+MACHINED_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS = --exclude .output --exclude buildroot
 
 define MACHINED_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/bin/machined $(TARGET_DIR)/sbin/init

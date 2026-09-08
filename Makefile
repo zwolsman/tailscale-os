@@ -21,7 +21,7 @@ CONFIG_DIR := $(ROOT_DIR)/configs
 BOARDS := $(patsubst $(CONFIG_DIR)/%_tailscaleos_defconfig,%,$(wildcard $(CONFIG_DIR)/*_tailscaleos_defconfig))
 
 ifdef BOARD
-OUT_DIR    	:= $(ROOT_DIR)/output/$(BOARD)
+OUT_DIR    	:= $(ROOT_DIR)/.output/$(BOARD)
 DEFCONFIG  	:= $(BOARD)_tailscaleos_defconfig
 MAKE_BR    	:= $(MAKE) -C $(BR_DIR) O=$(OUT_DIR) BR2_EXTERNAL=$(EXT_DIR)
 IMAGES_DIR 	:= $(OUT_DIR)/images

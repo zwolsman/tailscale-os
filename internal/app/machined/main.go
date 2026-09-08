@@ -52,13 +52,13 @@ func main() {
 	)
 
 	if err := os.MkdirAll("/run/tailscale-logs", 0700); err != nil {
-    	logf("mkdir log dir: %w", err)
+		logf("mkdir log dir: %w", err)
 	}
 
 	sup := newSupervisor(supervisorConfig{
 		path: "/usr/sbin/tailscaled",
 		args: []string{"--statedir=/run", "--state=mem:"},
-		env: []string{"PATH=/usr/sbin","TS_LOGS_DIR=/run/tailscale-logs"},
+		env:  []string{"PATH=/usr/sbin", "TS_LOGS_DIR=/run/tailscale-logs"},
 	})
 
 	sup.start()
@@ -121,7 +121,7 @@ func shutdown(mounts []mountSpec, sup *supervisor, poweroff bool) {
 type supervisorConfig struct {
 	path string
 	args []string
-	env []string
+	env  []string
 }
 
 type supervisor struct {
