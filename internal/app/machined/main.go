@@ -55,6 +55,13 @@ func main() {
 		unix.SIGUSR2, // reserved: poweroff request, wired up later
 	)
 
+	// start udev deamon
+	udevd := newSupervisor(supervisorConfig{
+		path: "/sbin/udevd",
+		args: []string{"--resolve-names=never"},
+	})
+	udevd.start()
+
 	// wait for udev to be up and settle
 	logf("waiting for udev to settle")
 	if err := waitForUdev(ctx); err != nil {

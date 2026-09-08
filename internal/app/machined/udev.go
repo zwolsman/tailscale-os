@@ -11,19 +11,24 @@ import (
 // waitForUdev waits for udevd to be ready to handle netlink device events.
 // It checks for the udev control socket and then runs udevadm settle.
 func waitForUdev(ctx context.Context) error {
-	// 1. Wait for the udev control socket to exist
+	// Wait for the udev control socket to exist
 	if err := waitForFile("/run/udev/control", ctx); err != nil {
 		return fmt.Errorf("waiting for udev control socket: %w", err)
 	}
 
-	// 2. Reload udev config
+	// Reload udev config
 	if err := runUdevadm("control", "--reload"); err != nil {
 		// non-fatal, just log
 		logf("warning: udevadm control --reload failed: %v\n", err)
 	}
 
-	// 3. Trigger device events (if needed)
+	// Trigger device events (if needed)
 	if err := runUdevadm("trigger", "--type=devices", "--action=add"); err != nil {
+		logf("warning: udevadm trigger failed: %v\n", err)
+	}
+
+	// Trigger subsystems (if needed)
+	if err := runUdevadm("trigger", "--type=subsystems", "--action=add"); err != nil {
 		logf("warning: udevadm trigger failed: %v\n", err)
 	}
 
