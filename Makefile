@@ -25,16 +25,17 @@ OUT_DIR    	:= $(ROOT_DIR)/.output/$(BOARD)
 DEFCONFIG  	:= $(BOARD)_tailscaleos_defconfig
 MAKE_BR    	:= $(MAKE) -C $(BR_DIR) O=$(OUT_DIR) BR2_EXTERNAL=$(EXT_DIR)
 IMAGES_DIR 	:= $(OUT_DIR)/images
-QEMU_ROOTFS	:= $(IMAGES_DIR)/rootfs-qemu.ext2
 endif
 
 # Per-board QEMU settings — add an entry here for each board you want to run in QEMU
 QEMU_MACHINE.orangepi_zero := orangepi-pc
 QEMU_DTB.orangepi_zero     := sun8i-h2-plus-orangepi-zero.dtb
-QEMU_ROOTFS_SIZE          := 64M
+QEMU_SYSTEM.orangepi_zero   := qemu-system-arm
+QEMU_ROOTFS_SIZE           := 64M
 
 QEMU_MACHINE := $(QEMU_MACHINE.$(BOARD))
 QEMU_DTB     := $(QEMU_DTB.$(BOARD))
+QEMU_SYSTEM	 := $(QEMU_SYSTEM.$(BOARD))
 
 .PHONY: all config menuconfig linux-menuconfig uboot-menuconfig \
         savedefconfig build clean distclean list help check-board \
@@ -88,7 +89,7 @@ check-qemu-board: check-board
 qemu-run: check-qemu-board
 	@test -f "$(IMAGES_DIR)/rootfs.ext2" || \
 		(echo "rootfs.ext2 not found in $(IMAGES_DIR). Run 'make build BOARD=$(BOARD)' first." && exit 1)
-	qemu-system-arm -M $(QEMU_MACHINE) -nic user -nographic \
+	$(QEMU_SYSTEM) -M $(QEMU_MACHINE) -nic user -nographic \
 		-kernel $(IMAGES_DIR)/zImage \
 		-dtb $(IMAGES_DIR)/$(QEMU_DTB) \
 		-drive file=$(IMAGES_DIR)/rootfs.ext2,if=sd,format=raw \
@@ -113,6 +114,6 @@ machined-reset: check-board
 
 machined-info: check-board
 	$(MAKE_BR) machined-show-info
- 
+
 br: check-board
 	$(MAKE_BR) $(ARGS)
