@@ -10,6 +10,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -17,6 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/insomniacslk/dhcp/dhcpv4"
+	"github.com/insomniacslk/dhcp/dhcpv4/nclient4"
 	"github.com/jsimonetti/rtnetlink"
 	"golang.org/x/sys/unix"
 )
@@ -69,7 +72,7 @@ func main() {
 	}
 
 	logf("setting up interfaces")
-	if err := setupNetworkInterfaces(); err != nil {
+	if err := setupNetworkInterfaces(ctx); err != nil {
 		logf("warning: setup network interfaces failed: %v", err)
 	}
 
@@ -242,7 +245,7 @@ func (s *supervisor) stop(timeout time.Duration) {
 	}
 }
 
-func setupNetworkInterfaces() error {
+func setupNetworkInterfaces(ctx context.Context) error {
 	conn, err := rtnetlink.Dial(nil)
 	if err != nil {
 		return err
@@ -272,6 +275,100 @@ func setupNetworkInterfaces() error {
 
 		if err != nil {
 			logf("could not bring %v up: %v", iface.Name, err)
+			continue
+		}
+
+		if iface.Name == "lo" {
+			continue
+		}
+
+		logf("fetching dhcp config for %v", iface.Name)
+
+		client, err := nclient4.New(iface.Name)
+		if err != nil {
+			logf("could not create dhcpv4 client for %v: %v", iface.Name, err)
+			continue
+		}
+
+		lease, err := client.Request(ctx)
+		if err != nil {
+			logf("could not get leae for %v: %v", iface.Name, err)
+			continue
+		}
+
+		if err := applyLease(conn, iface, lease.Offer); err != nil {
+			logf("could not apply lease for %v: %v", iface.Name, err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func applyLease(conn *rtnetlink.Conn, iface *net.Interface, lease *dhcpv4.DHCPv4) error {
+	ip := lease.YourIPAddr.To4()
+	if ip == nil {
+		return fmt.Errorf("invalid IPv4 lease address")
+	}
+	mask := lease.SubnetMask()
+	ones, bits := mask.Size()
+
+	if ones == 0 && bits == 0 || ones > 32 {
+		return fmt.Errorf("invalid or missing subnet mask in lease: %v", mask)
+	}
+
+	logf("applying lease: ip=%s prefixlen=%d", ip, ones)
+	// Add IP address
+	if err := conn.Address.New(&rtnetlink.AddressMessage{
+		Family:       unix.AF_INET,
+		Index:        uint32(iface.Index),
+		PrefixLength: uint8(ones),
+		Attributes:   &rtnetlink.AddressAttributes{Address: ip, Local: ip},
+		Scope:        unix.RT_SCOPE_UNIVERSE,
+	}); err != nil {
+		return fmt.Errorf("address: %w", err)
+	}
+
+	// Add routes for each gateway
+	for _, gw := range lease.Router() {
+		if err := conn.Route.Add(&rtnetlink.RouteMessage{
+			Family: unix.AF_INET,
+			Attributes: rtnetlink.RouteAttributes{
+				Gateway:  gw,
+				OutIface: uint32(iface.Index),
+				Table:    unix.RT_TABLE_MAIN,
+			},
+			Type:     unix.RTN_UNICAST,
+			Protocol: unix.RTPROT_BOOT,
+		}); err != nil {
+			return fmt.Errorf("route: %w", err)
+		}
+	}
+
+	// Add default route
+	if len(lease.Router()) > 0 {
+		if err := conn.Route.Replace(&rtnetlink.RouteMessage{
+			Family: unix.AF_INET,
+			Attributes: rtnetlink.RouteAttributes{
+				Dst:      net.IPv4zero,
+				Gateway:  lease.Router()[0],
+				OutIface: uint32(iface.Index),
+				Table:    unix.RT_TABLE_MAIN,
+			},
+			Type:     unix.RTN_UNICAST,
+			Protocol: unix.RTPROT_BOOT,
+		}); err != nil {
+			return fmt.Errorf("default route: %w", err)
+		}
+	}
+
+	// Apply MTU if present
+	if mtu, _ := dhcpv4.GetUint16(dhcpv4.OptionInterfaceMTU, lease.Options); mtu > 0 {
+		if err := conn.Link.Set(&rtnetlink.LinkMessage{
+			Index:      uint32(iface.Index),
+			Attributes: &rtnetlink.LinkAttributes{MTU: uint32(mtu)},
+		}); err != nil {
+			return fmt.Errorf("mtu: %w", err)
 		}
 	}
 
