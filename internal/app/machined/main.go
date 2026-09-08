@@ -51,10 +51,16 @@ func main() {
 		unix.SIGUSR2, // reserved: poweroff request, wired up later
 	)
 
+	if err := os.MkdirAll("/run/tailscale-logs", 0700); err != nil {
+    	logf("mkdir log dir: %w", err)
+	}
+
 	sup := newSupervisor(supervisorConfig{
 		path: "/usr/sbin/tailscaled",
-		args: []string{"--statedir=/run"},
+		args: []string{"--statedir=/run", "--state=mem:"},
+		env: []string{"PATH=/usr/sbin","TS_LOGS_DIR=/run/tailscale-logs"},
 	})
+
 	sup.start()
 
 	logf("entering main loop")
@@ -115,6 +121,7 @@ func shutdown(mounts []mountSpec, sup *supervisor, poweroff bool) {
 type supervisorConfig struct {
 	path string
 	args []string
+	env []string
 }
 
 type supervisor struct {
@@ -138,7 +145,7 @@ func (s *supervisor) start() {
 	// (or that the kernel sends on Ctrl-C from a console) don't also land
 	// on machined itself.
 	s.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	s.cmd.Env = []string{"PATH=/usr/sbin"}
+	s.cmd.Env = s.cfg.env
 
 	s.lastStart = time.Now()
 	if err := s.cmd.Start(); err != nil {
