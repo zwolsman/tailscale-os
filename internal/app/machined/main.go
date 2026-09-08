@@ -53,7 +53,7 @@ func main() {
 
 	sup := newSupervisor(supervisorConfig{
 		path: "/usr/sbin/tailscaled",
-		args: []string{},
+		args: []string{"--statedir=/run"},
 	})
 	sup.start()
 
@@ -138,6 +138,7 @@ func (s *supervisor) start() {
 	// (or that the kernel sends on Ctrl-C from a console) don't also land
 	// on machined itself.
 	s.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	s.cmd.Env = []string{"PATH=/usr/sbin"}
 
 	s.lastStart = time.Now()
 	if err := s.cmd.Start(); err != nil {
