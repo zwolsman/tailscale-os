@@ -9,16 +9,20 @@
 package main
 
 import (
+	"context"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/jsimonetti/rtnetlink"
 	"golang.org/x/sys/unix"
 )
 
 func main() {
+	ctx := context.Background()
 	if os.Getpid() != 1 {
 		// Running as PID 1 is a hard assumption throughout: reboot/poweroff,
 		// zombie reaping, and mount ownership all depend on it. Refusing to
@@ -50,6 +54,17 @@ func main() {
 		unix.SIGUSR1, // reserved: reboot request, wired up later
 		unix.SIGUSR2, // reserved: poweroff request, wired up later
 	)
+
+	// wait for udev to be up and settle
+	logf("waiting for udev to settle")
+	if err := waitForUdev(ctx); err != nil {
+		logf("warning: wait for udev failed: %v", err)
+	}
+
+	logf("setting up interfaces")
+	if err := setupNetworkInterfaces(); err != nil {
+		logf("warning: setup network interfaces failed: %v", err)
+	}
 
 	if err := os.MkdirAll("/run/tailscale-logs", 0700); err != nil {
 		logf("mkdir log dir: %w", err)
@@ -218,4 +233,40 @@ func (s *supervisor) stop(timeout time.Duration) {
 		_ = unix.Kill(pid, unix.SIGKILL)
 		<-done
 	}
+}
+
+func setupNetworkInterfaces() error {
+	conn, err := rtnetlink.Dial(nil)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	links, err := conn.Link.List()
+	if err != nil {
+		return err
+	}
+
+	for _, link := range links {
+		iface, err := net.InterfaceByIndex(int(link.Index))
+		if err != nil {
+			logf("could not fetch iface %v: %v (skipping)", link.Index, err)
+			continue
+		}
+		logf("bringin up %v (%v)", iface.Name, iface.Index)
+
+		err = conn.Link.Set(&rtnetlink.LinkMessage{
+			Family: unix.AF_UNSPEC,
+			Type:   link.Type,
+			Index:  link.Index,
+			Flags:  unix.IFF_UP,
+			Change: unix.IFF_UP,
+		})
+
+		if err != nil {
+			logf("could not bring %v up: %v", iface.Name, err)
+		}
+	}
+
+	return nil
 }
