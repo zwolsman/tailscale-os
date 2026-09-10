@@ -3,7 +3,6 @@ package system
 import (
 	"context"
 	"fmt"
-	"log"
 	"slices"
 	"sync"
 	"time"
@@ -32,8 +31,6 @@ type ServiceRunner struct {
 	id       string
 	instance *singleton
 
-	logger *log.Logger
-
 	state  events.ServiceState
 	events events.ServiceEvents
 
@@ -46,18 +43,12 @@ type ServiceRunner struct {
 
 // NewServiceRunner creates new ServiceRunner around Service instance.
 func NewServiceRunner(instance *singleton, service Service, runtime runtime.Runtime) *ServiceRunner {
-	id := service.ID(runtime)
-	w, err := runtime.Logging().ServiceLog("svc-runner-" + id).Writer()
-	if err != nil {
-		log.Fatalf("could not create logger: %v", err)
-	}
 
 	return &ServiceRunner{
 		service:          service,
 		instance:         instance,
 		runtime:          runtime,
-		id:               id,
-		logger:           log.New(w, "", 0),
+		id:               service.ID(runtime),
 		state:            events.StateInitialized,
 		stateSubscribers: make(map[StateEvent][]chan<- struct{}),
 		stopCh:           make(chan struct{}, 1),
@@ -81,8 +72,6 @@ func (svcrunner *ServiceRunner) UpdateState(ctx context.Context, newstate events
 		State:     newstate,
 		Timestamp: time.Now(),
 	}
-
-	svcrunner.logger.Printf("update state: %v", event)
 
 	svcrunner.state = newstate
 	svcrunner.events.Push(event)
@@ -263,9 +252,7 @@ func (svcrunner *ServiceRunner) run(ctx context.Context, runnr runner.Runner) er
 			}
 		}()
 
-		healthWg.Add(1)
-		go func() {
-			defer healthWg.Done()
+		healthWg.Go(func() {
 			//nolint:errcheck
 			health.Run(
 				ctx,
@@ -273,7 +260,7 @@ func (svcrunner *ServiceRunner) run(ctx context.Context, runnr runner.Runner) er
 				&svcrunner.healthState,
 				healthSvc.HealthFunc(svcrunner.runtime),
 			)
-		}()
+		})
 	}
 
 	select {
@@ -288,7 +275,7 @@ func (svcrunner *ServiceRunner) run(ctx context.Context, runnr runner.Runner) er
 	return nil
 }
 
-func (svcrunner *ServiceRunner) healthUpdate(ctx context.Context, change health.StateChange) {
+func (svcrunner *ServiceRunner) healthUpdate(_ context.Context, change health.StateChange) {
 	svcrunner.mu.Lock()
 
 	// service not running, suppress event
