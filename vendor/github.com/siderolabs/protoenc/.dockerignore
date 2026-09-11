@@ -1,0 +1,27 @@
+# THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
+#
+# Generated on 2025-10-06T12:49:11Z by kres bc281a9.
+
+*
+!messages
+!benchmarks_test.go
+!example_test.go
+!field_test.go
+!generated_message_test.go
+!helpers_test.go
+!main_test.go
+!map_test.go
+!marshal.go
+!marshal_test.go
+!person_test.go
+!predefined_types.go
+!protobuf_test.go
+!scanner.go
+!slice_test.go
+!type_cache.go
+!unmarshal.go
+!unmarshal_fastpath.go
+!go.mod
+!go.sum
+!.golangci.yml
+!hack/govulncheck.sh
