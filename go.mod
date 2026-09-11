@@ -4,6 +4,7 @@ go 1.26.6
 
 require (
 	github.com/jsimonetti/rtnetlink v1.4.2
+	github.com/siderolabs/gen v0.8.7
 	golang.org/x/sys v0.48.0
 )
 
@@ -25,7 +26,6 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.29 // indirect
 	github.com/sasha-s/go-deadlock v0.3.9 // indirect
 	github.com/siderolabs/crypto v0.6.5 // indirect
-	github.com/siderolabs/gen v0.8.7 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/u-root/uio v0.0.0-20240224005618-d2acac8f3701 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
