@@ -1,0 +1,218 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+// Package state describes interface of the core state manager/broker.
+package state
+
+import (
+	"context"
+
+	"github.com/cosi-project/runtime/pkg/resource"
+)
+
+// EventType is a type of StateEvent related to resource change.
+type EventType int
+
+// Various EventTypes.
+const (
+	// Created is the event type for when a resource got created.
+	Created EventType = iota
+	// Updated is the event type for when a resource got changed.
+	Updated
+	// Destroyed is the event type for when a resource was destroyed.
+	Destroyed
+	// Bootstrapped is the event type for when the initial set of items for WatchKind(WithBootstrapContents) was sent.
+	Bootstrapped
+	// Errored is the event type for when an error happened in the watch.
+	Errored
+	// Noop is the event type for a no-op event.
+	Noop
+)
+
+func _() {
+	var x [1]struct{}
+
+	_ = x[Created]
+	_ = x[Updated-1]
+	_ = x[Destroyed-2]
+	_ = x[Bootstrapped-3]
+	_ = x[Errored-4]
+	_ = x[Noop-5]
+}
+
+var eventTypeString = [...]string{"Created", "Updated", "Destroyed", "Bootstrapped", "Errored", "Noop"}
+
+func (eventType EventType) String() string {
+	return eventTypeString[eventType]
+}
+
+// Bookmark is an opaque value that can be used to resume watching from a specific point.
+type Bookmark []byte
+
+// Event is emitted when resource changes.
+type Event struct {
+	Resource resource.Resource
+	Old      resource.Resource
+	Error    error
+	Bookmark Bookmark
+	Type     EventType
+}
+
+// CoreStateReader is a read-only part of CoreState interface.
+type CoreStateReader interface {
+	// Get a resource by type and ID.
+	//
+	// If a resource is not found, error is returned.
+	Get(context.Context, resource.Pointer, ...GetOption) (resource.Resource, error)
+
+	// List resources by type.
+	List(context.Context, resource.Kind, ...ListOption) (resource.List, error)
+}
+
+// CoreStateWriter is a write-only part of CoreState interface.
+type CoreStateWriter interface {
+	// Create a resource.
+	//
+	// If a resource already exists, Create returns an error.
+	Create(context.Context, resource.Resource, ...CreateOption) error
+
+	// Update a resource.
+	//
+	// If a resource doesn't exist, error is returned.
+	// On update current version of resource `new` in the state should match
+	// the version on the backend, otherwise conflict error is returned.
+	Update(ctx context.Context, newResource resource.Resource, opts ...UpdateOption) error
+
+	// Destroy a resource.
+	//
+	// If a resource doesn't exist, error is returned.
+	// If a resource has pending finalizers, error is returned.
+	Destroy(context.Context, resource.Pointer, ...DestroyOption) error
+}
+
+// CoreStateWatcher is a watch part of CoreState interface.
+type CoreStateWatcher interface {
+	// Watch state of a resource by type.
+	//
+	// It's fine to watch for a resource which doesn't exist yet.
+	// Watch is canceled when context gets canceled.
+	// Watch sends initial resource state as the very first event on the channel,
+	// and then sends any updates to the resource as events.
+	Watch(context.Context, resource.Pointer, chan<- Event, ...WatchOption) error
+
+	// WatchKind watches resources of specific kind (namespace and type).
+	WatchKind(context.Context, resource.Kind, chan<- Event, ...WatchKindOption) error
+
+	// WatchKindAggregated watches resources of specific kind (namespace and type), updates are sent aggregated.
+	WatchKindAggregated(context.Context, resource.Kind, chan<- []Event, ...WatchKindOption) error
+}
+
+// CoreState is the central broker in the system handling state and changes.
+//
+// CoreState provides the core API that should be implemented.
+// State extends CoreState API, but it can be implemented on top of CoreState.
+type CoreState interface {
+	CoreStateReader
+	CoreStateWriter
+	CoreStateWatcher
+}
+
+// UpdaterFunc is called on resource to update it to the desired state.
+//
+// UpdaterFunc should also bump resource version.
+type UpdaterFunc func(resource.Resource) error
+
+// Teardowner is an optional interface a CoreState implementation may satisfy
+// to provide a native Teardown that does not require a separate Get+Update.
+//
+// When the wrapped CoreState satisfies Teardowner, [WrapCore]'s [State.Teardown]
+// delegates directly to it; otherwise the default Get+Update fallback is used.
+//
+// This interface is primarily useful for transport-layer adapters (e.g. the
+// gRPC client) where the default Get+Update implementation translates into
+// multiple network round-trips, and for state implementations that can perform
+// the phase change atomically.
+type Teardowner interface {
+	Teardown(context.Context, resource.Pointer, ...TeardownOption) (bool, error)
+}
+
+// TeardownAndDestroyer is an optional interface a CoreState implementation may
+// satisfy to provide a native TeardownAndDestroy that does not require the
+// caller to watch the resource between teardown and destroy.
+//
+// When the wrapped CoreState satisfies TeardownAndDestroyer, [WrapCore]'s
+// [State.TeardownAndDestroy] delegates directly to it; otherwise the default
+// Teardown + WatchFor + Destroy fallback is used.
+//
+// This interface is primarily useful for transport-layer adapters (e.g. the
+// gRPC client) where the default implementation requires a Watch with read
+// access to the resource. With this interface the wait happens server-side
+// and the caller observes only the final result.
+type TeardownAndDestroyer interface {
+	TeardownAndDestroy(context.Context, resource.Pointer, ...TeardownAndDestroyOption) error
+}
+
+// StateReader is a read-only part of State interface.
+type StateReader interface {
+	CoreStateReader
+
+	// ContextWithTeardown returns a new context which will be canceled when the resource is torn down or destroyed.
+	//
+	// The passed in context should be canceled, otherwise the goroutine might leak from this call.
+	// If the resource doesn't exist, the context is canceled immediately.
+	ContextWithTeardown(context.Context, resource.Pointer) (context.Context, error)
+}
+
+// StateWriter is a write-only part of State interface.
+type StateWriter interface {
+	CoreStateWriter
+
+	// UpdateWithConflicts automatically handles conflicts on update.
+	UpdateWithConflicts(context.Context, resource.Pointer, UpdaterFunc, ...UpdateOption) (resource.Resource, error)
+
+	// Teardown a resource (mark as being destroyed).
+	//
+	// If a resource doesn't exist, error is returned.
+	// It's not an error to tear down a resource which is already being torn down.
+	// Teardown returns a flag telling whether it's fine to destroy a resource.
+	Teardown(context.Context, resource.Pointer, ...TeardownOption) (bool, error)
+
+	// AddFinalizer adds finalizer to resource metadata handling conflicts.
+	AddFinalizer(context.Context, resource.Pointer, ...resource.Finalizer) error
+
+	// RemoveFinalizer removes finalizer from resource metadata handling conflicts.
+	RemoveFinalizer(context.Context, resource.Pointer, ...resource.Finalizer) error
+
+	// TeardownAndDestroy a resource.
+	//
+	// If a resource doesn't exist, error is returned.
+	// It's not an error to tear down a resource which is already being torn down.
+	// The call blocks until all resource finalizers are empty.
+	TeardownAndDestroy(context.Context, resource.Pointer, ...TeardownAndDestroyOption) error
+
+	// Modify modifies an existing resource or creates a new one.
+	//
+	// It is a shorthand for Get+UpdateWithConflicts+Create.
+	Modify(ctx context.Context, emptyResource resource.Resource, updateFunc func(resource.Resource) error, options ...UpdateOption) error
+
+	// ModifyWithResult modifies an existing resource or creates a new one.
+	//
+	// It is a shorthand for Get+UpdateWithConflicts+Create.
+	ModifyWithResult(ctx context.Context, emptyResource resource.Resource, updateFunc func(resource.Resource) error, options ...UpdateOption) (resource.Resource, error)
+}
+
+// StateWatcher is a watch part of State interface.
+type StateWatcher interface {
+	CoreStateWatcher
+
+	// WatchFor watches for resource to reach all of the specified conditions.
+	WatchFor(context.Context, resource.Pointer, ...WatchForConditionFunc) (resource.Resource, error)
+}
+
+// State extends CoreState with additional features which can be implemented on top of any CoreState.
+type State interface {
+	StateReader
+	StateWriter
+	StateWatcher
+}
