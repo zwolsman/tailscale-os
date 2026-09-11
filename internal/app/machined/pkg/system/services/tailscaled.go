@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"log"
+	"os"
 	"time"
 
 	"github.com/siderolabs/talos/pkg/conditions"
@@ -22,12 +24,16 @@ func (c *Tailscaled) ID(runtime.Runtime) string {
 
 // PreFunc implements the Service interface.
 func (c *Tailscaled) PreFunc(ctx context.Context, r runtime.Runtime) error {
-	return nil // return nil
+	if err := os.MkdirAll("/run/tailscale-logs", 0700); err != nil {
+		log.Printf("mkdir log dir: %w", err)
+		return err
+	}
+	return nil
 }
 
 // PostFunc implements the Service interface.
 func (c *Tailscaled) PostFunc(runtime.Runtime, interface{}) error {
-	return nil // return nil
+	return nil
 }
 
 // Condition implements the Service interface.
