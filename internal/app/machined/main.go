@@ -16,9 +16,15 @@ import (
 	"os/signal"
 	"time"
 
+	cruntime "github.com/cosi-project/runtime/pkg/controller/runtime"
+	clogging "github.com/cosi-project/runtime/pkg/logging"
+	"github.com/cosi-project/runtime/pkg/state"
+	"github.com/cosi-project/runtime/pkg/state/impl/inmem"
+	"github.com/cosi-project/runtime/pkg/state/impl/namespaced"
+
 	"github.com/insomniacslk/dhcp/dhcpv4"
-	"github.com/insomniacslk/dhcp/dhcpv4/nclient4"
 	"github.com/jsimonetti/rtnetlink"
+	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/controllers/network"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime/logging"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/system"
@@ -75,14 +81,16 @@ func main() {
 		log.Printf("warning: wait for udev failed: %v", err)
 	}
 
-	log.Println("setting up interfaces")
-	if err := setupNetworkInterfaces(ctx); err != nil {
-		log.Printf("warning: setup network interfaces failed: %v", err)
+	controllerRuntime, err := cruntime.NewRuntime(rt.State(), clogging.DefaultLogger())
+	if err != nil {
+		log.Fatalf("could not create controller runtime: %v", err)
 	}
 
-	if err := os.MkdirAll("/run/tailscale-logs", 0700); err != nil {
-		log.Printf("mkdir log dir: %w", err)
+	if err := controllerRuntime.RegisterController(&network.LinkSpecController{}); err != nil {
+		log.Fatalf("could not register network controller: %v", err)
 	}
+
+	go controllerRuntime.Run(ctx)
 
 	// Start tailscaled using the service system
 	tailscaled := &services.Tailscaled{}
@@ -136,66 +144,6 @@ func shutdown(mounts []mountSpec, poweroff bool) {
 		log.Fatalf("reboot syscall failed: %v", err)
 		select {}
 	}
-}
-
-func setupNetworkInterfaces(ctx context.Context) error {
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	links, err := conn.Link.List()
-	if err != nil {
-		return err
-	}
-
-	for _, link := range links {
-		iface, err := net.InterfaceByIndex(int(link.Index))
-		if err != nil {
-			log.Printf("could not fetch iface %v: %v (skipping)", link.Index, err)
-			continue
-		}
-		log.Printf("bringin up %v (%v)", iface.Name, iface.Index)
-
-		err = conn.Link.Set(&rtnetlink.LinkMessage{
-			Family: unix.AF_UNSPEC,
-			Type:   link.Type,
-			Index:  link.Index,
-			Flags:  unix.IFF_UP,
-			Change: unix.IFF_UP,
-		})
-
-		if err != nil {
-			log.Printf("could not bring %v up: %v", iface.Name, err)
-			continue
-		}
-
-		if iface.Name == "lo" {
-			continue
-		}
-
-		log.Printf("fetching dhcp config for %v", iface.Name)
-
-		client, err := nclient4.New(iface.Name)
-		if err != nil {
-			log.Printf("could not create dhcpv4 client for %v: %v", iface.Name, err)
-			continue
-		}
-
-		lease, err := client.Request(ctx)
-		if err != nil {
-			log.Printf("could not get leae for %v: %v", iface.Name, err)
-			continue
-		}
-
-		if err := applyLease(conn, iface, lease.Offer); err != nil {
-			log.Printf("could not apply lease for %v: %v", iface.Name, err)
-			continue
-		}
-	}
-
-	return nil
 }
 
 func applyLease(conn *rtnetlink.Conn, iface *net.Interface, lease *dhcpv4.DHCPv4) error {
@@ -269,17 +217,23 @@ var _ runtime.Runtime = (*Runtime)(nil)
 func NewRuntime(l runtime.LoggingManager) runtime.Runtime {
 	return &Runtime{
 		l: l,
+		s: state.WrapCore(namespaced.NewState(inmem.Build)),
 	}
 }
 
 // Runtime implements the Runtime interface.
 type Runtime struct {
 	l runtime.LoggingManager
+	s state.State
 }
 
 // Logging implements the Runtime interface.
 func (r *Runtime) Logging() runtime.LoggingManager {
 	return r.l
+}
+
+func (r *Runtime) State() state.State {
+	return r.s
 }
 
 // Events returns a simple event stream for the runtime.
