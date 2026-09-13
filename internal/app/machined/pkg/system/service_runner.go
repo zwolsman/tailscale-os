@@ -2,7 +2,9 @@ package system
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"slices"
 	"sync"
 	"time"
@@ -73,13 +75,29 @@ func (svcrunner *ServiceRunner) UpdateState(ctx context.Context, newstate events
 		Timestamp: time.Now(),
 	}
 
+	if newstate == events.StateRunning {
+		event.Health = svcrunner.healthState.Get()
+	}
+
 	svcrunner.state = newstate
 	svcrunner.events.Push(event)
+
+	log.Printf("service[%s](%s): %s", svcrunner.id, svcrunner.state, event.Message)
 
 	isUp := svcrunner.inStateLocked(StateEventUp)
 	isDown := svcrunner.inStateLocked(StateEventDown)
 	isFinished := svcrunner.inStateLocked(StateEventFinished)
 	svcrunner.mu.Unlock()
+
+	if svcrunner.runtime != nil {
+		machineEvent := event.AsProto(svcrunner.id)
+
+		if data, err := json.Marshal(machineEvent); err != nil {
+			log.Printf("could not publish event: %v", err)
+		} else {
+			svcrunner.runtime.Events().Publish(ctx, data)
+		}
+	}
 
 	if isUp {
 		svcrunner.notifyEvent(StateEventUp)
@@ -225,6 +243,10 @@ func (svcrunner *ServiceRunner) run(ctx context.Context, runnr runner.Runner) er
 	go func() {
 		_, err := runnr.Run(ctx, func(s events.ServiceState, msg string, args ...any) {
 			svcrunner.UpdateState(ctx, s, msg, args...)
+
+			if _, healthSupported := svcrunner.service.(HealthcheckedService); healthSupported && s != events.StateRunning {
+				svcrunner.healthState.Update(false, "service not running")
+			}
 		}, func(pid int32) {})
 
 		errCh <- err
@@ -275,7 +297,7 @@ func (svcrunner *ServiceRunner) run(ctx context.Context, runnr runner.Runner) er
 	return nil
 }
 
-func (svcrunner *ServiceRunner) healthUpdate(_ context.Context, change health.StateChange) {
+func (svcrunner *ServiceRunner) healthUpdate(ctx context.Context, change health.StateChange) {
 	svcrunner.mu.Lock()
 
 	// service not running, suppress event
@@ -299,11 +321,23 @@ func (svcrunner *ServiceRunner) healthUpdate(_ context.Context, change health.St
 	}
 	svcrunner.events.Push(event)
 
+	log.Printf("service[%s](%s): %s", svcrunner.id, svcrunner.state, event.Message)
+
 	isUp := svcrunner.inStateLocked(StateEventUp)
 	svcrunner.mu.Unlock()
 
 	if isUp {
 		svcrunner.notifyEvent(StateEventUp)
+	}
+
+	if svcrunner.runtime != nil {
+		machineEvent := event.AsProto(svcrunner.id)
+
+		if data, err := json.Marshal(machineEvent); err != nil {
+			log.Printf("could not publish event: %v", err)
+		} else {
+			svcrunner.runtime.Events().Publish(ctx, data)
+		}
 	}
 }
 

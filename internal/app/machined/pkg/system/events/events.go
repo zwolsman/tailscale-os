@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/system/health"
+	machineapi "github.com/zwolsman/tailscale-os/pkg/machinery/api/machine"
 )
 
 const MaxEventsToKeep = 64
@@ -55,6 +56,16 @@ type ServiceEvent struct {
 	State     ServiceState
 	Health    health.Status
 	Timestamp time.Time
+}
+
+// AsProto returns protobuf representation of respective machined event.
+func (event *ServiceEvent) AsProto(service string) *machineapi.ServiceStateEvent {
+	return &machineapi.ServiceStateEvent{
+		Service: service,
+		Action:  machineapi.ServiceStateEvent_Action(event.State),
+		Message: event.Message,
+		Health:  event.Health.AsProto(),
+	}
 }
 
 // ServiceEvents is a fixed length history of events.

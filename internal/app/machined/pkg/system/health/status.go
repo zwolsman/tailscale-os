@@ -4,6 +4,8 @@ import (
 	"slices"
 	"sync"
 	"time"
+
+	machineapi "github.com/zwolsman/tailscale-os/pkg/machinery/api/machine"
 )
 
 // Status of the healthcheck.
@@ -11,6 +13,18 @@ type Status struct {
 	Healthy     *bool
 	LastChange  time.Time
 	LastMessage string
+}
+
+// AsProto returns protobuf-ready health state.
+func (status *Status) AsProto() *machineapi.ServiceHealth {
+	// tspb := timestamppb.New(status.LastChange)
+
+	return &machineapi.ServiceHealth{
+		Unknown: status.Healthy == nil,
+		Healthy: status.Healthy != nil && *status.Healthy,
+		// TODO: LastMessage: status.LastMessage,
+		// TODO: LastChange:  tspb,
+	}
 }
 
 // StateChange is used to notify about status changes.
