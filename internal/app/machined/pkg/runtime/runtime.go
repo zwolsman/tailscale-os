@@ -1,8 +1,6 @@
 package runtime
 
 import (
-	"context"
-
 	"github.com/cosi-project/runtime/pkg/state"
 )
 
@@ -12,10 +10,4 @@ type Runtime interface {
 	Events() EventStream
 	State() state.State
 	ResetRestartBackoff()
-}
-
-// EventStream provides the runtime event stream.
-type EventStream interface {
-	Publish(ctx context.Context, msg any)
-	EventCh() <-chan struct{}
 }

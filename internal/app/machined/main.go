@@ -14,21 +14,17 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"time"
 
-	cruntime "github.com/cosi-project/runtime/pkg/controller/runtime"
-	clogging "github.com/cosi-project/runtime/pkg/logging"
 	"github.com/cosi-project/runtime/pkg/state"
 	"github.com/cosi-project/runtime/pkg/state/impl/inmem"
 	"github.com/cosi-project/runtime/pkg/state/impl/namespaced"
 
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/jsimonetti/rtnetlink"
-	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/controllers/network"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime/logging"
+	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime/v1alpha1"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/system"
-	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/system/services"
 	"golang.org/x/sys/unix"
 )
 
@@ -62,42 +58,17 @@ func main() {
 	)
 
 	l := logging.NewSimpleLoggerManager(log.New(os.Stdout, "[machined] ", log.LstdFlags|log.Lmicroseconds))
-	rt := NewRuntime(l)
+	e := v1alpha1.NewEvents(1000, 10)
+	rt := NewRuntime(l, e)
 
-	// Initialize the system services using the talos-inspired runtime/service pattern
-	svc := system.Services(rt)
-
-	// Load and start udevd using the service system
-	udevd := &services.Udevd{}
-	svc.Load(udevd)
-
-	if err := svc.Start(udevd.ID(rt)); err != nil {
-		log.Printf("warning: failed to start udevd service: %v", err)
-	}
-
-	// Wait for udev to settle
-	log.Println("waiting for udev to settle")
-	if err := waitForUdev(ctx, udevd.ID(rt)); err != nil {
-		log.Printf("warning: wait for udev failed: %v", err)
-	}
-
-	controllerRuntime, err := cruntime.NewRuntime(rt.State(), clogging.DefaultLogger())
+	ctrl, err := NewController(rt, func(ctx context.Context) error {
+		return nil
+	})
 	if err != nil {
-		log.Fatalf("could not create controller runtime: %v", err)
+		log.Fatalf("could not create root controller: %v", err)
 	}
 
-	if err := controllerRuntime.RegisterController(&network.LinkStatusController{}); err != nil {
-		log.Fatalf("could not register network controller: %v", err)
-	}
-
-	go controllerRuntime.Run(ctx)
-
-	// Start tailscaled using the service system
-	tailscaled := &services.Tailscaled{}
-	svc.Load(tailscaled)
-	if err := svc.Start(tailscaled.ID(nil)); err != nil {
-		log.Printf("warning: failed to start tailscaled service: %v", err)
-	}
+	go ctrl.Run(ctx, nil)
 
 	log.Println("entering main loop")
 
@@ -214,10 +185,11 @@ func applyLease(conn *rtnetlink.Conn, iface *net.Interface, lease *dhcpv4.DHCPv4
 
 var _ runtime.Runtime = (*Runtime)(nil)
 
-func NewRuntime(l runtime.LoggingManager) runtime.Runtime {
+func NewRuntime(l runtime.LoggingManager, e runtime.EventStream) runtime.Runtime {
 	return &Runtime{
 		l: l,
 		s: state.WrapCore(namespaced.NewState(inmem.Build)),
+		e: e,
 	}
 }
 
@@ -225,6 +197,7 @@ func NewRuntime(l runtime.LoggingManager) runtime.Runtime {
 type Runtime struct {
 	l runtime.LoggingManager
 	s state.State
+	e runtime.EventStream
 }
 
 // Logging implements the Runtime interface.
@@ -238,29 +211,8 @@ func (r *Runtime) State() state.State {
 
 // Events returns a simple event stream for the runtime.
 func (r *Runtime) Events() runtime.EventStream {
-	return &simpleEventStream{}
+	return r.e
 }
 
 // ResetRestartBackoff is a no-op for the simple runtime.
 func (r *Runtime) ResetRestartBackoff() {}
-
-// simpleEventStream is a minimal EventStream implementation.
-type simpleEventStream struct {
-	ch chan struct{}
-}
-
-func (s *simpleEventStream) Publish(ctx context.Context, msg any) {
-	// no-op for simple runtime
-}
-
-func (s *simpleEventStream) EventCh() <-chan struct{} {
-	return s.ch
-}
-
-// WaitForUdevd waits for the controller-owned udevd service to become healthy.
-func waitForUdev(ctx context.Context, serviceID string) error {
-	waitCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
-
-	return system.WaitForService(system.StateEventUp, serviceID).Wait(waitCtx)
-}

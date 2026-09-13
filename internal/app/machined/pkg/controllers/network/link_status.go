@@ -12,6 +12,7 @@ import (
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/ethtool"
 	"github.com/siderolabs/talos/pkg/machinery/nethelpers"
+	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/controllers/runtime"
 	"github.com/zwolsman/tailscale-os/pkg/machinery/resources/network"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
@@ -43,6 +44,14 @@ func (l *LinkStatusController) Outputs() []controller.Output {
 
 // Run implements [controller.Controller].
 func (ctrl *LinkStatusController) Run(ctx context.Context, r controller.Runtime, logger *zap.Logger) error {
+	// wait for udevd to be healthy, which implies that all link renames are done
+	if err := runtime.WaitForDevicesReady(
+		ctx, r,
+		[]controller.Input{},
+	); err != nil {
+		return err
+	}
+
 	conn, err := rtnetlink.Dial(nil)
 	if err != nil {
 		return fmt.Errorf("error dialing rtnetlink socket: %w", err)

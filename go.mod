@@ -12,6 +12,7 @@ require (
 	github.com/siderolabs/talos/pkg/machinery v1.14.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/sys v0.48.0
+	github.com/rs/xid v1.6.0
 )
 
 require (
