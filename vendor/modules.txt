@@ -92,9 +92,19 @@ github.com/insomniacslk/dhcp/rfc1035label
 ## explicit; go 1.20
 github.com/jsimonetti/rtnetlink
 github.com/jsimonetti/rtnetlink/internal/unix
+# github.com/jsimonetti/rtnetlink/v2 v2.2.1-0.20260802200809-43bafec815b3
+## explicit; go 1.25.0
+github.com/jsimonetti/rtnetlink/v2
+github.com/jsimonetti/rtnetlink/v2/internal/unix
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
+# github.com/mdlayher/ethtool v0.6.1
+## explicit; go 1.25.0
+github.com/mdlayher/ethtool
+# github.com/mdlayher/genetlink v1.4.0
+## explicit; go 1.25.0
+github.com/mdlayher/genetlink
 # github.com/mdlayher/netlink v1.11.2
 ## explicit; go 1.25.0
 github.com/mdlayher/netlink
@@ -157,6 +167,7 @@ github.com/siderolabs/talos/pkg/conditions
 # github.com/siderolabs/talos/pkg/machinery v1.14.0
 ## explicit; go 1.26.5
 github.com/siderolabs/talos/pkg/machinery/constants
+github.com/siderolabs/talos/pkg/machinery/nethelpers
 # github.com/spf13/pflag v1.0.10
 ## explicit; go 1.12
 github.com/spf13/pflag
@@ -209,6 +220,7 @@ golang.org/x/oauth2/internal
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.48.0
 ## explicit; go 1.26.0
+golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
