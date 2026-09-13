@@ -86,7 +86,7 @@ func main() {
 		log.Fatalf("could not create controller runtime: %v", err)
 	}
 
-	if err := controllerRuntime.RegisterController(&network.LinkSpecController{}); err != nil {
+	if err := controllerRuntime.RegisterController(&network.LinkStatusController{}); err != nil {
 		log.Fatalf("could not register network controller: %v", err)
 	}
 
