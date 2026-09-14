@@ -52,9 +52,10 @@ func NewController(v1alpha1Runtime runtime.Runtime, reboot func(ctx context.Cont
 // Run the controller runtime.
 func (ctrl *Controller) Run(ctx context.Context, drainer *runtime.Drainer) error {
 	for _, c := range []controller.Controller{
-		&runtimecontrollers.UdevServiceController{V1Alpha1Services: system.Services(ctrl.v1alpha1Runtime)},
-		&runtimecontrollers.DeviceStatusController{},
+		network.NewDHCP4Controller(),
 		&network.LinkStatusController{},
+		&runtimecontrollers.DeviceStatusController{},
+		&runtimecontrollers.UdevServiceController{V1Alpha1Services: system.Services(ctrl.v1alpha1Runtime)},
 		&v1alpha1.ServiceController{V1Alpha1Events: ctrl.v1alpha1Runtime.Events()},
 	} {
 		if err := ctrl.controllerRuntime.RegisterController(c); err != nil {
