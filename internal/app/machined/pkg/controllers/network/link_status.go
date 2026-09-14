@@ -191,7 +191,7 @@ func (ctrl *LinkStatusController) syncLink(ctx context.Context, r controller.Run
 		}
 
 		if prevUp != status.LinkState && status.Physical() {
-			logger.Info("link state changed", zap.String("link", link.Attributes.Name), zap.Bool("up", status.LinkState))
+			logger.Info("link state changed", zap.Bool("up", status.LinkState))
 		}
 
 		if ethInfo != nil {
@@ -212,7 +212,7 @@ func (ctrl *LinkStatusController) syncLink(ctx context.Context, r controller.Run
 
 		deviceInfo, err := nethelpers.GetDeviceInfo(link.Attributes.Name)
 		if err != nil {
-			logger.Warn("failure getting device information from /sys/class/net/*", zap.Error(err), zap.String("link", link.Attributes.Name))
+			logger.Warn("failure getting device information from /sys/class/net/*", zap.Error(err))
 		}
 
 		if deviceInfo != nil {

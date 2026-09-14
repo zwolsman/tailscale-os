@@ -63,7 +63,7 @@ func (ctrl *ServiceController) Run(ctx context.Context, r controller.Runtime, lo
 					return
 				}
 			}
-			logger.Debug("Received event", zap.Any("event", event))
+
 			var msg machine.ServiceStateEvent
 			if err := json.Unmarshal(event.Payload, &msg); err == nil {
 				service := v1alpha1.NewService(msg.Service)

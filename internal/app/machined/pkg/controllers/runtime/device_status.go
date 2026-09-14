@@ -76,7 +76,6 @@ func (d *DeviceStatusController) Run(ctx context.Context, r controller.Runtime, 
 		}
 
 		// everything is done, ready, stop the controller
-		logger.Debug("Devices ready")
 		return nil
 	}
 }

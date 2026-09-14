@@ -5,7 +5,8 @@ import (
 
 	"github.com/cosi-project/runtime/pkg/controller"
 	osruntime "github.com/cosi-project/runtime/pkg/controller/runtime"
-	"github.com/cosi-project/runtime/pkg/logging"
+
+	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/logging"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/system"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/v1alpha1"
@@ -13,6 +14,7 @@ import (
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/controllers/network"
 	runtimecontrollers "github.com/zwolsman/tailscale-os/internal/app/machined/pkg/controllers/runtime"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Controller struct {
@@ -29,7 +31,7 @@ type Controller struct {
 // NewController creates Controller.
 func NewController(v1alpha1Runtime runtime.Runtime, reboot func(ctx context.Context) error) (*Controller, error) {
 	ctrl := &Controller{
-		consoleLogLevel: zap.NewAtomicLevel(),
+		consoleLogLevel: zap.NewAtomicLevelAt(zap.DebugLevel),
 		loggingManager:  v1alpha1Runtime.Logging(),
 		v1alpha1Runtime: v1alpha1Runtime,
 		reboot:          reboot,
@@ -65,22 +67,19 @@ func (ctrl *Controller) Run(ctx context.Context, drainer *runtime.Drainer) error
 
 // MakeLogger creates a logger for a service.
 func (ctrl *Controller) MakeLogger(serviceName string) (*zap.Logger, error) {
-	// logWriter, err := ctrl.loggingManager.ServiceLog(serviceName).Writer()
-	// if err != nil {
-	// 	return nil, err
-	// }
+	logWriter, err := ctrl.loggingManager.ServiceLog(serviceName).Writer()
+	if err != nil {
+		return nil, err
+	}
 
-	return logging.DefaultLogger().Named(serviceName), nil
-
-	// return logging.ZapLogger(
-	// 	logging.NewLogDestination(
-	// 		logWriter, zapcore.DebugLevel,
-	// 	),
-	// 	logging.NewLogDestination(
-	// 		logging.StdWriter, ctrl.consoleLogLevel,
-	// 		logging.WithoutTimestamp(),
-	// 		logging.WithoutLogLevels(),
-	// 		logging.WithControllerErrorSuppressor(constants.ConsoleLogErrorSuppressThreshold),
-	// 	),
-	// ).With(logging.Component(serviceName)), nil
+	return logging.ZapLogger(
+		logging.NewLogDestination(
+			logWriter, zapcore.DebugLevel,
+		),
+		logging.NewLogDestination(
+			logging.StdWriter, ctrl.consoleLogLevel,
+			logging.WithoutTimestamp(),
+			logging.WithoutLogLevels(),
+		),
+	).With(logging.Component(serviceName)), nil
 }
