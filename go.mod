@@ -6,13 +6,15 @@ require (
 	github.com/cosi-project/runtime v1.16.3
 	github.com/insomniacslk/dhcp v0.0.0-20260901064844-234b97448fae
 	github.com/jsimonetti/rtnetlink v1.4.2
+	github.com/mdlayher/ethtool v0.6.1
+	github.com/rs/xid v1.6.0
 	github.com/siderolabs/gen v0.8.7
 	github.com/siderolabs/go-cmd v0.2.1
 	github.com/siderolabs/talos v1.14.0
 	github.com/siderolabs/talos/pkg/machinery v1.14.0
 	go.uber.org/zap v1.28.0
+	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb
 	golang.org/x/sys v0.48.0
-	github.com/rs/xid v1.6.0
 )
 
 require (
@@ -28,11 +30,12 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/josharian/native v1.1.0 // indirect
 	github.com/jsimonetti/rtnetlink/v2 v2.2.1-0.20260802200809-43bafec815b3 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/mdlayher/ethtool v0.6.1 // indirect
 	github.com/mdlayher/genetlink v1.4.0 // indirect
 	github.com/mdlayher/netlink v1.11.2 // indirect
+	github.com/mdlayher/packet v1.1.2 // indirect
 	github.com/mdlayher/socket v0.6.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
