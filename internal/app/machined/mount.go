@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"golang.org/x/sys/unix"
@@ -47,12 +48,12 @@ func mountAll(specs []mountSpec) error {
 			if err == unix.EBUSY {
 				// Already mounted (common for /dev, sometimes /proc under QEMU
 				// direct kernel boot). Not fatal.
-				logf("mount: %s already mounted, skipping", m.target)
+				log.Printf("mount: %s already mounted, skipping", m.target)
 				continue
 			}
 			return fmt.Errorf("mount %s on %s (%s): %w", m.source, m.target, m.fstype, err)
 		}
-		logf("mount: %s -> %s (%s) ok", m.source, m.target, m.fstype)
+		log.Printf("mount: %s -> %s (%s) ok", m.source, m.target, m.fstype)
 	}
 	return nil
 }
@@ -68,9 +69,9 @@ func syncAndUnmountAll(specs []mountSpec) {
 	for i := len(specs) - 1; i >= 0; i-- {
 		target := specs[i].target
 		if err := unix.Unmount(target, unix.MNT_DETACH); err != nil {
-			logf("unmount: %s failed: %v", target, err)
+			log.Printf("unmount: %s failed: %v", target, err)
 			continue
 		}
-		logf("unmount: %s ok", target)
+		log.Printf("unmount: %s ok", target)
 	}
 }

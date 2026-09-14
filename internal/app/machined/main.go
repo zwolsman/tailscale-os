@@ -44,10 +44,6 @@ func main() {
 		log.Fatalf("mount setup failed: %v ; continuing in degraded mode", err)
 	}
 
-	if err := unix.Sethostname([]byte("machined-dev")); err != nil {
-		log.Printf("warning: sethostname failed: %v", err)
-	}
-
 	sigCh := make(chan os.Signal, 8)
 	signal.Notify(sigCh,
 		unix.SIGCHLD,
@@ -57,7 +53,7 @@ func main() {
 		unix.SIGUSR2,
 	)
 
-	l := logging.NewSimpleLoggerManager(log.New(os.Stdout, "[machined] ", log.LstdFlags|log.Lmicroseconds))
+	l := &logging.NullLoggingManager{} //logging.NewSimpleLoggerManager(log.New(os.Stdout, "[machined] ", log.LstdFlags|log.Lmicroseconds))
 	e := v1alpha1.NewEvents(1000, 10)
 	rt := NewRuntime(l, e)
 
