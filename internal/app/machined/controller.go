@@ -52,6 +52,7 @@ func NewController(v1alpha1Runtime runtime.Runtime, reboot func(ctx context.Cont
 // Run the controller runtime.
 func (ctrl *Controller) Run(ctx context.Context, drainer *runtime.Drainer) error {
 	for _, c := range []controller.Controller{
+		&network.AddressSpecController{},
 		network.NewDHCP4Controller(),
 		&network.LinkStatusController{},
 		&runtimecontrollers.DeviceStatusController{},
