@@ -52,6 +52,8 @@ github.com/cosi-project/runtime/pkg/state
 github.com/cosi-project/runtime/pkg/state/impl/inmem
 github.com/cosi-project/runtime/pkg/state/impl/namespaced
 github.com/cosi-project/runtime/pkg/state/owned
+github.com/cosi-project/runtime/pkg/state/protobuf/client
+github.com/cosi-project/runtime/pkg/state/protobuf/server
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
@@ -82,6 +84,9 @@ github.com/hashicorp/errwrap
 # github.com/hashicorp/go-multierror v1.1.1
 ## explicit; go 1.13
 github.com/hashicorp/go-multierror
+# github.com/inconshreveable/mousetrap v1.1.0
+## explicit; go 1.18
+github.com/inconshreveable/mousetrap
 # github.com/insomniacslk/dhcp v0.0.0-20260901064844-234b97448fae
 ## explicit; go 1.25.0
 github.com/insomniacslk/dhcp/dhcpv4
@@ -181,6 +186,9 @@ github.com/siderolabs/talos/pkg/conditions
 ## explicit; go 1.26.5
 github.com/siderolabs/talos/pkg/machinery/constants
 github.com/siderolabs/talos/pkg/machinery/nethelpers
+# github.com/spf13/cobra v1.10.2
+## explicit; go 1.15
+github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.10
 ## explicit; go 1.12
 github.com/spf13/pflag
