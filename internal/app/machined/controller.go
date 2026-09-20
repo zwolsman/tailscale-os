@@ -9,10 +9,10 @@ import (
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/logging"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/system"
-	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/v1alpha1"
 
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/controllers/network"
 	runtimecontrollers "github.com/zwolsman/tailscale-os/internal/app/machined/pkg/controllers/runtime"
+	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/controllers/v1alpha1"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -57,6 +57,7 @@ func (ctrl *Controller) Run(ctx context.Context, drainer *runtime.Drainer) error
 		&network.LinkStatusController{},
 		&runtimecontrollers.DeviceStatusController{},
 		&runtimecontrollers.UdevServiceController{V1Alpha1Services: system.Services(ctrl.v1alpha1Runtime)},
+		&runtimecontrollers.ApidServiceController{V1Alpha1Services: system.Services(ctrl.v1alpha1Runtime)},
 		&v1alpha1.ServiceController{V1Alpha1Events: ctrl.v1alpha1Runtime.Events()},
 	} {
 		if err := ctrl.controllerRuntime.RegisterController(c); err != nil {

@@ -126,7 +126,7 @@ func (ctrl *LinkStatusController) syncLink(ctx context.Context, r controller.Run
 	)
 
 	// Bring up physical interfaces
-	if link.Type == uint16(nethelpers.LinkEther) {
+	if link.Type == uint16(nethelpers.LinkEther) || link.Type == uint16(nethelpers.LinkLoopbck) {
 		if err := conn.Link.Set(&rtnetlink.LinkMessage{
 			Family: unix.AF_UNSPEC,
 			Type:   link.Type,
@@ -190,7 +190,7 @@ func (ctrl *LinkStatusController) syncLink(ctx context.Context, r controller.Run
 			status.LinkState = false
 		}
 
-		if prevUp != status.LinkState && status.Physical() {
+		if prevUp != status.LinkState {
 			logger.Info("link state changed", zap.Bool("up", status.LinkState))
 		}
 

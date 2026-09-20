@@ -35,6 +35,7 @@ type PreShutdownService interface {
 
 // HealthcheckedService is a service which provides health check.
 type HealthcheckedService interface {
+	Service
 	// HealthFunc provides function that checks health of the service
 	HealthFunc(runtime.Runtime) health.Check
 	// HealthSettings returns settings for the health check
