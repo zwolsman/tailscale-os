@@ -89,7 +89,7 @@ check-qemu-board: check-board
 qemu-run: check-qemu-board
 	@test -f "$(IMAGES_DIR)/rootfs.ext2" || \
 		(echo "rootfs.ext2 not found in $(IMAGES_DIR). Run 'make build BOARD=$(BOARD)' first." && exit 1)
-	$(QEMU_SYSTEM) -M $(QEMU_MACHINE) -nic user -nographic \
+	$(QEMU_SYSTEM) -M $(QEMU_MACHINE) -nic user,hostfwd=tcp::6666-:6666 -nographic \
 		-kernel $(IMAGES_DIR)/zImage \
 		-dtb $(IMAGES_DIR)/$(QEMU_DTB) \
 		-drive file=$(IMAGES_DIR)/rootfs.ext2,if=sd,format=raw \
