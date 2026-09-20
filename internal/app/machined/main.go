@@ -9,9 +9,7 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 
@@ -19,8 +17,6 @@ import (
 	"github.com/cosi-project/runtime/pkg/state/impl/inmem"
 	"github.com/cosi-project/runtime/pkg/state/impl/namespaced"
 
-	"github.com/insomniacslk/dhcp/dhcpv4"
-	"github.com/jsimonetti/rtnetlink"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime/logging"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime/v1alpha1"
@@ -53,7 +49,7 @@ func main() {
 		unix.SIGUSR2,
 	)
 
-	l := &logging.NullLoggingManager{} //logging.NewSimpleLoggerManager(log.New(os.Stdout, "[machined] ", log.LstdFlags|log.Lmicroseconds))
+	l := &logging.NullLoggingManager{}
 	e := v1alpha1.NewEvents(1000, 10)
 	rt := NewRuntime(l, e)
 
@@ -113,80 +109,20 @@ func shutdown(mounts []mountSpec, poweroff bool) {
 	}
 }
 
-func applyLease(conn *rtnetlink.Conn, iface *net.Interface, lease *dhcpv4.DHCPv4) error {
-	ip := lease.YourIPAddr.To4()
-	if ip == nil {
-		return fmt.Errorf("invalid IPv4 lease address")
-	}
-	mask := lease.SubnetMask()
-	ones, bits := mask.Size()
-
-	if ones == 0 && bits == 0 || ones > 32 {
-		return fmt.Errorf("invalid or missing subnet mask in lease: %v", mask)
-	}
-
-	log.Printf("applying lease: ip=%s prefixlen=%d", ip, ones)
-	if err := conn.Address.New(&rtnetlink.AddressMessage{
-		Family:       unix.AF_INET,
-		Index:        uint32(iface.Index),
-		PrefixLength: uint8(ones),
-		Attributes:   &rtnetlink.AddressAttributes{Address: ip, Local: ip},
-		Scope:        unix.RT_SCOPE_UNIVERSE,
-	}); err != nil {
-		return fmt.Errorf("address: %w", err)
-	}
-
-	for _, gw := range lease.Router() {
-		if err := conn.Route.Add(&rtnetlink.RouteMessage{
-			Family: unix.AF_INET,
-			Attributes: rtnetlink.RouteAttributes{
-				Gateway:  gw,
-				OutIface: uint32(iface.Index),
-				Table:    unix.RT_TABLE_MAIN,
-			},
-			Type:     unix.RTN_UNICAST,
-			Protocol: unix.RTPROT_BOOT,
-		}); err != nil {
-			return fmt.Errorf("route: %w", err)
-		}
-	}
-
-	if len(lease.Router()) > 0 {
-		if err := conn.Route.Replace(&rtnetlink.RouteMessage{
-			Family: unix.AF_INET,
-			Attributes: rtnetlink.RouteAttributes{
-				Dst:      net.IPv4zero,
-				Gateway:  lease.Router()[0],
-				OutIface: uint32(iface.Index),
-				Table:    unix.RT_TABLE_MAIN,
-			},
-			Type:     unix.RTN_UNICAST,
-			Protocol: unix.RTPROT_BOOT,
-		}); err != nil {
-			return fmt.Errorf("default route: %w", err)
-		}
-	}
-
-	if mtu, _ := dhcpv4.GetUint16(dhcpv4.OptionInterfaceMTU, lease.Options); mtu > 0 {
-		if err := conn.Link.Set(&rtnetlink.LinkMessage{
-			Index:      uint32(iface.Index),
-			Attributes: &rtnetlink.LinkAttributes{MTU: uint32(mtu)},
-		}); err != nil {
-			return fmt.Errorf("mtu: %w", err)
-		}
-	}
-
-	return nil
-}
-
 var _ runtime.Runtime = (*Runtime)(nil)
 
 func NewRuntime(l runtime.LoggingManager, e runtime.EventStream) runtime.Runtime {
 	return &Runtime{
 		l: l,
-		s: state.WrapCore(namespaced.NewState(inmem.Build)),
+		s: NewState(),
 		e: e,
 	}
+}
+
+func NewState() state.State {
+	// TODO: register all resources for api to use
+	// reference:  siderolabs/talos/internal/app/machined/pkg/runtime/v1alpha2/v1alpha2_state.go
+	return state.WrapCore(namespaced.NewState(inmem.Build))
 }
 
 // Runtime implements the Runtime interface.
