@@ -2,7 +2,7 @@ package tsos
 
 import (
 	"context"
-	"log"
+	"os"
 	"strings"
 
 	"github.com/cosi-project/runtime/api/v1alpha1"
@@ -12,6 +12,7 @@ import (
 	"github.com/cosi-project/runtime/pkg/state"
 	cosiclient "github.com/cosi-project/runtime/pkg/state/protobuf/client"
 	"github.com/siderolabs/gen/xslices"
+	"github.com/zwolsman/tailscale-os/cmd/tsosctl/cmd/tsos/output"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -23,6 +24,7 @@ import (
 var getCmdFlags struct {
 	node      string
 	namespace string
+	output    string
 }
 
 var getCmd = &cobra.Command{
@@ -62,10 +64,16 @@ func getResources(ctx context.Context, args []string, client *client) error {
 		return err
 	}
 
-	return listResources(ctx, client, rd, resourceID)
+	w, err := output.NewWriter("yaml", os.Stdout)
+
+	if err != nil {
+		return err
+	}
+
+	return listResources(ctx, w, client, rd, resourceID)
 }
 
-func listResources(ctx context.Context, client *client, rd *meta.ResourceDefinition, resourceID resource.ID) error {
+func listResources(ctx context.Context, writer output.Writer, client *client, rd *meta.ResourceDefinition, resourceID resource.ID) error {
 	resourceType := rd.TypedSpec().Type
 
 	if resourceID == "" {
@@ -79,7 +87,7 @@ func listResources(ctx context.Context, client *client, rd *meta.ResourceDefinit
 		}
 
 		for _, item := range items.Items {
-			log.Printf("%v", item)
+			writer.WriteResource(item)
 		}
 	} else {
 		r, err := client.COSI.Get(
@@ -90,7 +98,8 @@ func listResources(ctx context.Context, client *client, rd *meta.ResourceDefinit
 		if err != nil {
 			return err
 		}
-		log.Printf("%v", r)
+
+		writer.WriteResource(r)
 	}
 
 	return nil
@@ -165,6 +174,7 @@ func (c *client) resolveResourceKind(ctx context.Context, resourceNamespace *res
 func init() {
 	getCmd.Flags().StringVar(&getCmdFlags.namespace, "namespace", "", "resource namespace (default is to use default namespace per resource)")
 	getCmd.Flags().StringVar(&getCmdFlags.node, "node", "", "")
+	getCmd.Flags().StringVarP(&getCmdFlags.output, "output", "o", "yaml", "output mode (yaml)")
 
 	addCommand(getCmd)
 }
