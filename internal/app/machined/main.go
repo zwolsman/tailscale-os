@@ -14,8 +14,6 @@ import (
 	"os/signal"
 
 	"github.com/cosi-project/runtime/pkg/state"
-	"github.com/cosi-project/runtime/pkg/state/impl/inmem"
-	"github.com/cosi-project/runtime/pkg/state/impl/namespaced"
 
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime"
 	"github.com/zwolsman/tailscale-os/internal/app/machined/pkg/runtime/logging"
@@ -37,7 +35,7 @@ func main() {
 
 	mounts := essentialMounts()
 	if err := mountAll(mounts); err != nil {
-		log.Fatalf("mount setup failed: %v ; continuing in degraded mode", err)
+		log.Fatalf("mount setup failed: %v", err)
 	}
 
 	sigCh := make(chan os.Signal, 8)
@@ -51,7 +49,13 @@ func main() {
 
 	l := &logging.NullLoggingManager{}
 	e := v1alpha1.NewEvents(1000, 10)
-	rt := NewRuntime(l, e)
+	s, err := v1alpha1.NewState()
+
+	if err != nil {
+		log.Fatalf("state setup failed: %v", err)
+	}
+
+	rt := NewRuntime(l, e, s)
 
 	ctrl, err := NewController(rt, func(ctx context.Context) error {
 		return nil
@@ -111,24 +115,18 @@ func shutdown(mounts []mountSpec, poweroff bool) {
 
 var _ runtime.Runtime = (*Runtime)(nil)
 
-func NewRuntime(l runtime.LoggingManager, e runtime.EventStream) runtime.Runtime {
+func NewRuntime(l runtime.LoggingManager, e runtime.EventStream, s runtime.State) runtime.Runtime {
 	return &Runtime{
 		l: l,
-		s: NewState(),
+		s: s,
 		e: e,
 	}
-}
-
-func NewState() state.State {
-	// TODO: register all resources for api to use
-	// reference:  siderolabs/talos/internal/app/machined/pkg/runtime/v1alpha2/v1alpha2_state.go
-	return state.WrapCore(namespaced.NewState(inmem.Build))
 }
 
 // Runtime implements the Runtime interface.
 type Runtime struct {
 	l runtime.LoggingManager
-	s state.State
+	s runtime.State
 	e runtime.EventStream
 }
 
@@ -138,7 +136,7 @@ func (r *Runtime) Logging() runtime.LoggingManager {
 }
 
 func (r *Runtime) State() state.State {
-	return r.s
+	return r.s.Resources()
 }
 
 // Events returns a simple event stream for the runtime.
