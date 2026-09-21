@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"github.com/cosi-project/runtime/pkg/resource"
 	"github.com/cosi-project/runtime/pkg/resource/meta"
+	"github.com/cosi-project/runtime/pkg/resource/protobuf"
 	"github.com/cosi-project/runtime/pkg/resource/typed"
 )
 
@@ -52,5 +53,14 @@ func (ServiceExtension) ResourceDefinition() meta.ResourceDefinitionSpec {
 				JSONPath: "{.unknown}",
 			},
 		},
+	}
+}
+
+func init() {
+	// proto.RegisterDefaultTypes()
+
+	err := protobuf.RegisterDynamic(ServiceType, &Service{})
+	if err != nil {
+		panic(err)
 	}
 }
