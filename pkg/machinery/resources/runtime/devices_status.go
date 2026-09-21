@@ -3,6 +3,7 @@ package runtime
 import (
 	"github.com/cosi-project/runtime/pkg/resource"
 	"github.com/cosi-project/runtime/pkg/resource/meta"
+	"github.com/cosi-project/runtime/pkg/resource/protobuf"
 	"github.com/cosi-project/runtime/pkg/resource/typed"
 )
 
@@ -46,5 +47,14 @@ func (DevicesStatusExtension) ResourceDefinition() meta.ResourceDefinitionSpec {
 				JSONPath: `{.ready}`,
 			},
 		},
+	}
+}
+
+func init() {
+	// proto.RegisterDefaultTypes()
+
+	err := protobuf.RegisterDynamic(DevicesStatusType, &DevicesStatus{})
+	if err != nil {
+		panic(err)
 	}
 }

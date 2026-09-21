@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/cosi-project/runtime/pkg/resource"
 	"github.com/cosi-project/runtime/pkg/resource/meta"
+	"github.com/cosi-project/runtime/pkg/resource/protobuf"
 	"github.com/cosi-project/runtime/pkg/resource/typed"
 	"github.com/siderolabs/talos/pkg/machinery/nethelpers"
 )
@@ -96,5 +97,14 @@ func (LinkStatusExtension) ResourceDefinition() meta.ResourceDefinitionSpec {
 			},
 		},
 		Sensitivity: meta.NonSensitive,
+	}
+}
+
+func init() {
+	// proto.RegisterDefaultTypes()
+
+	err := protobuf.RegisterDynamic(LinkStatusType, &LinkStatus{})
+	if err != nil {
+		panic(err)
 	}
 }
