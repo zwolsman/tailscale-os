@@ -45,8 +45,6 @@ func (AddressSpecExtension) ResourceDefinition() meta.ResourceDefinitionSpec {
 }
 
 func init() {
-	// proto.RegisterDefaultTypes()
-
 	err := protobuf.RegisterDynamic(AddressSpecType, &AddressSpec{})
 	if err != nil {
 		panic(err)
