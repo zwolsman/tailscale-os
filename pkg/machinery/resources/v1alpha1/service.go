@@ -57,8 +57,6 @@ func (ServiceExtension) ResourceDefinition() meta.ResourceDefinitionSpec {
 }
 
 func init() {
-	// proto.RegisterDefaultTypes()
-
 	err := protobuf.RegisterDynamic(ServiceType, &Service{})
 	if err != nil {
 		panic(err)

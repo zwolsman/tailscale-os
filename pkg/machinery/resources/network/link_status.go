@@ -101,8 +101,6 @@ func (LinkStatusExtension) ResourceDefinition() meta.ResourceDefinitionSpec {
 }
 
 func init() {
-	// proto.RegisterDefaultTypes()
-
 	err := protobuf.RegisterDynamic(LinkStatusType, &LinkStatus{})
 	if err != nil {
 		panic(err)
