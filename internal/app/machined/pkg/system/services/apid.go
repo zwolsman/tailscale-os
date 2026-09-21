@@ -21,7 +21,7 @@ import (
 
 var _ system.HealthcheckedService = (*APID)(nil)
 
-const protocol, endpoint = "tcp", "127.0.0.1:6666"
+const protocol, endpoint = "tcp", ":6666" // TODO: bind to localhost, workaround for now with QEMU
 
 type APID struct{}
 
