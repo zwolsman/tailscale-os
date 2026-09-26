@@ -91,7 +91,7 @@ func (ctrl *AddressSpecController) Run(ctx context.Context, r controller.Runtime
 		// loop over addresses and make reconcile decision
 		for address := range list.All() {
 			if err = ctrl.syncAddress(ctx, r, logger, conn, links, addrs, address); err != nil {
-				return err
+				return err // TODO: multi error
 			}
 		}
 

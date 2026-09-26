@@ -13,6 +13,9 @@ import (
 // NamespaceName contains resources related to networking.
 const NamespaceName resource.Namespace = "network"
 
+// DefaultRouteMetric is the default route metric if no metric was specified explicitly.
+const DefaultRouteMetric = 1024
+
 func RouteID(table nethelpers.RoutingTable, family nethelpers.Family, destination netip.Prefix, gateway netip.Addr, priority uint32, outLinkName string) string {
 	dst, _ := destination.MarshalText() //nolint:errcheck
 	gw, _ := gateway.MarshalText()      //nolint:errcheck
