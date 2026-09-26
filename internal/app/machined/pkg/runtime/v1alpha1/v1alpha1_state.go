@@ -41,7 +41,7 @@ func NewState() (*State, error) {
 		name        string
 		description string
 	}{
-		{v1alpha1.NamespaceName, "Tailscale os v1alpha1 subsystems glue resources."},
+		{v1alpha1.NamespaceName, "Tailscale OS v1alpha1 subsystems glue resources."},
 	} {
 		if err := s.namespaceRegistry.Register(ctx, ns.name, ns.description); err != nil {
 			return nil, err
@@ -51,6 +51,7 @@ func NewState() (*State, error) {
 	for _, r := range []meta.ResourceWithRD{
 		&network.AddressSpec{},
 		&network.LinkStatus{},
+		&network.RouteSpec{},
 		&runtime.DevicesStatus{},
 		&v1alpha1.Service{},
 	} {

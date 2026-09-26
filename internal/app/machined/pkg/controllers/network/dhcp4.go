@@ -2,7 +2,9 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/cosi-project/runtime/pkg/controller"
@@ -54,6 +56,10 @@ func (d *DHCP4Controller) Outputs() []controller.Output {
 	return []controller.Output{
 		{
 			Type: network.AddressSpecType,
+			Kind: controller.OutputShared,
+		},
+		{
+			Type: network.RouteSpecType,
 			Kind: controller.OutputShared,
 		},
 	}
@@ -207,10 +213,12 @@ func computeTimers(ack *dhcpv4.DHCPv4) leaseTimers {
 }
 
 func (ctrl *DHCP4Controller) applyLease(ctx context.Context, r controller.Runtime, logger *zap.Logger, linkName resource.ID, ack *dhcpv4.DHCPv4) error {
-	addrID := "dhcp4/" + linkName
+	addr, _ := netipx.FromStdIPNet(&net.IPNet{
+		IP:   ack.YourIPAddr,
+		Mask: ack.SubnetMask(),
+	})
 
-	addr := network.NewAddressSpec(network.NamespaceName, addrID)
-	if err := safe.WriterModify(ctx, r, addr, func(a *network.AddressSpec) error {
+	if err := safe.WriterModify(ctx, r, network.NewAddressSpec(network.NamespaceName, fmt.Sprintf("dhcp4/%s", linkName)), func(a *network.AddressSpec) error {
 		spec := a.TypedSpec()
 
 		addr, _ := netipx.FromStdIPNet(&net.IPNet{
@@ -224,21 +232,60 @@ func (ctrl *DHCP4Controller) applyLease(ctx context.Context, r controller.Runtim
 		spec.Scope = nethelpers.ScopeGlobal
 		spec.Flags = nethelpers.AddressFlags(nethelpers.AddressPermanent)
 
-		logger.Debug("Creating address spec", zap.Any("spec", spec))
-
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	// TODO: apply routes
-	// for _, router := range ack.Router() {
-	// 	gw, _ := netipx.FromStdIP(router)
-	// }
+	var routes []network.RouteSpecSpec
+
+	logger.Debug("ack routes", zap.Any("len", len(ack.Router())))
+
+	for _, router := range ack.Router() {
+		gw, _ := netipx.FromStdIP(router)
+		routes = append(routes, network.RouteSpecSpec{
+			Family:      nethelpers.FamilyInet4,
+			Gateway:     gw,
+			Source:      addr.Addr(),
+			OutLinkName: linkName,
+			Table:       nethelpers.TableMain,
+			Scope:       nethelpers.ScopeGlobal,
+			Type:        nethelpers.TypeUnicast,
+			Protocol:    nethelpers.ProtocolBoot,
+		})
+
+		if !addr.Contains(gw) {
+			// Add an interface route for the gateway if it's not in the same network
+			routes = append(routes, network.RouteSpecSpec{
+				Family:      nethelpers.FamilyInet4,
+				Destination: netip.PrefixFrom(gw, gw.BitLen()),
+				Source:      addr.Addr(),
+				OutLinkName: linkName,
+				Table:       nethelpers.TableMain,
+				Scope:       nethelpers.ScopeLink,
+				Type:        nethelpers.TypeUnicast,
+				Protocol:    nethelpers.ProtocolBoot,
+			})
+		}
+	}
+
+	for _, route := range routes {
+		route.Normalize()
+		id := network.RouteID(route.Table, route.Family, route.Destination, route.Gateway, route.Priority, route.OutLinkName)
+
+		logger.Debug("adding route", zap.Any("id", id))
+		if err := safe.WriterModify(ctx, r, network.NewRouteSpec(network.NamespaceName, id), func(r *network.RouteSpec) error {
+			*r.TypedSpec() = route
+
+			return nil
+		}); err != nil {
+			return fmt.Errorf("error applying spec: %w", err)
+		}
+	}
+
 	return nil
 }
 
 func (ctrl *DHCP4Controller) destroy(ctx context.Context, r controller.Runtime, linkName resource.ID) error {
-	addrID := "dhcp4/" + linkName
-	return r.Destroy(ctx, resource.NewMetadata(network.NamespaceName, network.AddressSpecType, addrID, resource.VersionUndefined))
+	return r.Destroy(ctx, resource.NewMetadata(network.NamespaceName, network.AddressSpecType, fmt.Sprintf("dhcp4/%s", linkName), resource.VersionUndefined))
 }
