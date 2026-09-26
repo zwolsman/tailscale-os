@@ -51,6 +51,7 @@ func NewState() (*State, error) {
 	for _, r := range []meta.ResourceWithRD{
 		&network.AddressSpec{},
 		&network.LinkStatus{},
+		&network.ResolverSpec{},
 		&network.RouteSpec{},
 		&runtime.DevicesStatus{},
 		&v1alpha1.Service{},

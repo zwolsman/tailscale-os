@@ -8,7 +8,7 @@ import (
 	"github.com/siderolabs/talos/pkg/machinery/nethelpers"
 )
 
-//go:generate go tool github.com/siderolabs/deep-copy -type LinkStatusSpec -type AddressSpecSpec -type RouteSpecSpec -o deep_copy.generated.go .
+//go:generate go tool github.com/siderolabs/deep-copy -type LinkStatusSpec -type AddressSpecSpec -type RouteSpecSpec -type ResolverSpecSpec -o deep_copy.generated.go .
 
 // NamespaceName contains resources related to networking.
 const NamespaceName resource.Namespace = "network"

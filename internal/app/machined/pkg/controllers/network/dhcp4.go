@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/cosi-project/runtime/pkg/controller"
@@ -12,6 +14,7 @@ import (
 	"github.com/cosi-project/runtime/pkg/safe"
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/insomniacslk/dhcp/dhcpv4/nclient4"
+	"github.com/siderolabs/gen/xslices"
 	"github.com/siderolabs/talos/pkg/machinery/nethelpers"
 	"github.com/zwolsman/tailscale-os/pkg/machinery/resources/network"
 	"go.uber.org/zap"
@@ -60,6 +63,10 @@ func (d *DHCP4Controller) Outputs() []controller.Output {
 		},
 		{
 			Type: network.RouteSpecType,
+			Kind: controller.OutputShared,
+		},
+		{
+			Type: network.ResolverSpecType,
 			Kind: controller.OutputShared,
 		},
 	}
@@ -218,6 +225,7 @@ func (ctrl *DHCP4Controller) applyLease(ctx context.Context, r controller.Runtim
 		Mask: ack.SubnetMask(),
 	})
 
+	// Addresses
 	if err := safe.WriterModify(ctx, r, network.NewAddressSpec(network.NamespaceName, fmt.Sprintf("dhcp4/%s", linkName)), func(a *network.AddressSpec) error {
 		spec := a.TypedSpec()
 
@@ -237,8 +245,8 @@ func (ctrl *DHCP4Controller) applyLease(ctx context.Context, r controller.Runtim
 		return err
 	}
 
+	// Routes
 	var routes []network.RouteSpecSpec
-
 	logger.Debug("ack routes", zap.Any("len", len(ack.Router())))
 
 	for _, router := range ack.Router() {
@@ -283,9 +291,75 @@ func (ctrl *DHCP4Controller) applyLease(ctx context.Context, r controller.Runtim
 		}
 	}
 
+	// Name servers
+	searchDomains := dhcpSearchDomains(ack)
+
+	if len(ack.DNS()) > 0 || len(searchDomains) > 0 {
+		convertIP := func(ip net.IP) netip.Addr {
+			result, _ := netipx.FromStdIP(ip)
+
+			return result
+		}
+
+		if err := safe.WriterModify(ctx, r, network.NewResolverSpec(network.NamespaceName, network.ResolverID), func(r *network.ResolverSpec) error {
+			resolver := r.TypedSpec()
+			resolver.NameServers = xslices.Map(ack.DNS(), func(ip net.IP) network.NameServerSpec {
+				return network.NameServerSpec{Addr: convertIP(ip)}
+			})
+
+			resolver.SearchDomains = searchDomains
+			return nil
+		}); err != nil {
+			return fmt.Errorf("error applying spec: %w", err)
+		}
+	}
+
 	return nil
 }
 
 func (ctrl *DHCP4Controller) destroy(ctx context.Context, r controller.Runtime, linkName resource.ID) error {
 	return r.Destroy(ctx, resource.NewMetadata(network.NamespaceName, network.AddressSpecType, fmt.Sprintf("dhcp4/%s", linkName), resource.VersionUndefined))
+}
+
+// dhcpSearchDomains returns search domains from DHCP options 119 (Domain Search) and 15 (Domain Name).
+//
+// Search domains which contain whitespace or control characters are skipped, as they
+// would allow to inject extra content into /etc/resolv.conf.
+func dhcpSearchDomains(ack *dhcpv4.DHCPv4) []string {
+	var searchDomains []string
+
+	if labels := ack.DomainSearch(); labels != nil {
+		for _, domain := range labels.Labels {
+			if validateDNSNameChars(domain) == nil {
+				searchDomains = append(searchDomains, domain)
+			}
+		}
+	}
+
+	if domainName := strings.TrimRight(ack.DomainName(), "\x00"); domainName != "" &&
+		validateDNSNameChars(domainName) == nil &&
+		!slices.Contains(searchDomains, domainName) {
+		searchDomains = append(searchDomains, domainName)
+	}
+
+	return searchDomains
+}
+
+// ValidateDNSNameChars checks that a hostname, domain name or search domain doesn't contain
+// whitespace or control characters.
+//
+// Such characters are never valid in DNS names.
+//
+// The check is intentionally permissive otherwise (e.g. underscores, uppercase or non-ASCII characters are allowed),
+// as in general a hostname in UNIX is not strictly limited to the characters allowed in DNS names.
+//
+// The check runs over bytes of the string, so it does not validate that the string is valid UTF-8.
+func validateDNSNameChars(name string) error {
+	for i := range len(name) {
+		if c := name[i]; c <= ' ' || c == 0x7f {
+			return fmt.Errorf("name %q contains invalid character %q at position %d", name, c, i)
+		}
+	}
+
+	return nil
 }
